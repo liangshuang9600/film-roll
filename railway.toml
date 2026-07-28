@@ -1,0 +1,12 @@
+[build]
+builder = "nixpacks"
+
+[build.nixpacks]
+install_cmd = "npm install --ignore-scripts"
+build_cmd = "npm run build"
+
+[deploy]
+startCommand = "npm start"
+healthcheckPath = "/api/rolls"
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3

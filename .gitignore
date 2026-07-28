@@ -1,0 +1,6 @@
+node_modules
+server/uploads
+server/filmroll.db
+*.db
+.DS_Store
+client/dist

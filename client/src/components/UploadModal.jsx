@@ -41,7 +41,11 @@ export default function UploadModal({ isOpen, onClose, onUpload, rollId }) {
       try { data = await res.json(); } catch (_) { /* non-JSON response */ }
 
       if (!res.ok) {
-        const reason = data?.error || `服务器返回 ${res.status}`;
+        let reason = data?.error || `服务器返回 ${res.status}`;
+        // Surface per-file failure reasons so we can see the real cause
+        if (Array.isArray(data?.failed) && data.failed.length > 0) {
+          reason += '\n' + data.failed.map(f => `· ${f.name}：${f.reason}`).join('\n');
+        }
         throw new Error(reason);
       }
 

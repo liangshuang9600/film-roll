@@ -25,13 +25,24 @@ export const storage = {
     return result.content; // Buffer
   },
 
+  // Cheap existence check (HEAD) — does NOT download the object body.
+  async head(filename) {
+    try {
+      await client.head(key(filename));
+      return true;
+    } catch (e) {
+      return false;
+    }
+  },
+
   async remove(filename) {
     await client.delete(key(filename)).catch(() => {});
   },
 
-  // Signed URL valid for 1 hour so serving routes can redirect the browser.
+  // Signed URL valid for 2 hours; embedded directly in API responses so the
+  // browser can load images straight from OSS.
   getUrl(filename) {
-    return client.signatureUrl(key(filename), { expires: 3600 });
+    return client.signatureUrl(key(filename), { expires: 7200 });
   },
 
   getPath() {

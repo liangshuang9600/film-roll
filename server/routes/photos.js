@@ -5,7 +5,7 @@ import { nanoid } from 'nanoid';
 import { Jimp } from 'jimp';
 import archiver from 'archiver';
 import { queryAll, queryOne, run, saveDB } from '../db.js';
-import { storage } from '../storage/index.js';
+import { storage, withUrls } from '../storage/index.js';
 
 const router = Router();
 
@@ -89,7 +89,7 @@ router.post('/upload/:rollId', upload.array('photos', 50), async (req, res) => {
       return res.status(500).json({ error: '所有照片处理失败', failed });
     }
 
-    res.status(201).json({ photos, failed });
+    res.status(201).json({ photos: photos.map(withUrls), failed });
   } catch (err) {
     console.error('[upload] fatal error:', err);
     res.status(500).json({ error: err.message || '上传失败' });
@@ -108,13 +108,9 @@ router.get('/file/:filename', async (req, res) => {
 router.get('/thumb/:filename', async (req, res) => {
   const thumb = thumbName(req.params.filename);
   if (storage.isRemote) {
-    try {
-      await storage.get(thumb);
-      return res.redirect(storage.getUrl(thumb));
-    } catch (e) {
-      // Fallback to original if no thumbnail exists remotely
-      return res.redirect(storage.getUrl(req.params.filename));
-    }
+    // Cheap HEAD check (no full download); fall back to original if missing.
+    const exists = await storage.head(thumb);
+    return res.redirect(storage.getUrl(exists ? thumb : req.params.filename));
   }
   res.sendFile(storage.getPath(thumb), (err) => {
     if (err) {

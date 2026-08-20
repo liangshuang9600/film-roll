@@ -57,7 +57,7 @@ export default function LightBox({ photo, photos, currentIndex, onClose, onNavig
       {/* Image */}
       <div className="max-w-[90vw] max-h-[85vh] relative" onClick={(e) => e.stopPropagation()}>
         <img
-          src={`/api/photos/file/${photo.filename}`}
+          src={photo.url || `/api/photos/file/${photo.filename}`}
           alt={photo.original_name}
           className="max-w-full max-h-[85vh] object-contain rounded shadow-2xl"
         />

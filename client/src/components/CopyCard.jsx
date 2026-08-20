@@ -51,7 +51,7 @@ export default function CopyCard({ caption, photos, onSelectCover, onRegenerate,
         <div className="relative aspect-[3/4] bg-film-darker">
           {cover && (
             <img
-              src={`/api/photos/file/${cover.filename}`}
+              src={cover.url || `/api/photos/file/${cover.filename}`}
               alt="cover"
               className="w-full h-full object-cover"
             />
@@ -78,7 +78,7 @@ export default function CopyCard({ caption, photos, onSelectCover, onRegenerate,
                 className={`flex-shrink-0 w-14 h-14 rounded-md overflow-hidden border-2 transition-colors
                   ${p.id === caption.cover_photo_id ? 'border-film-amber' : 'border-transparent hover:border-film-border'}`}
               >
-                <img src={`/api/photos/thumb/${p.filename}`} alt="" className="w-full h-full object-cover" />
+                <img src={p.thumb_url || `/api/photos/thumb/${p.filename}`} alt="" className="w-full h-full object-cover" />
               </button>
             ))}
           </div>

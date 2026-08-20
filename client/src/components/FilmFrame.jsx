@@ -30,7 +30,7 @@ export default function FilmFrame({ photo, index, onClick, size = 'normal' }) {
         {photo ? (
           <>
             <img
-              src={`/api/photos/thumb/${photo.filename}`}
+              src={photo.thumb_url || `/api/photos/thumb/${photo.filename}`}
               alt={photo.original_name || `Frame ${index + 1}`}
               className={`w-full h-full object-cover transition-opacity duration-500 ${loaded ? 'opacity-100' : 'opacity-0'}`}
               onLoad={() => setLoaded(true)}

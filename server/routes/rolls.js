@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { queryAll, queryOne, run, saveDB } from '../db.js';
+import { withUrls } from '../storage/index.js';
 
 const router = Router();
 
@@ -18,7 +19,7 @@ router.get('/', async (req, res) => {
       'SELECT id, filename FROM photos WHERE roll_id = ? ORDER BY sort_order LIMIT 6',
       [roll.id]
     );
-    rollsWithPreviews.push({ ...roll, previews });
+    rollsWithPreviews.push({ ...roll, previews: previews.map(withUrls) });
   }
 
   res.json(rollsWithPreviews);
@@ -34,7 +35,7 @@ router.get('/:id', async (req, res) => {
     [roll.id]
   );
 
-  res.json({ ...roll, photos });
+  res.json({ ...roll, photos: photos.map(withUrls) });
 });
 
 // Create a new roll

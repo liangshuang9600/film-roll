@@ -19,59 +19,81 @@ function thumbName(filename) {
 
 // Upload photos to a roll (batch)
 router.post('/upload/:rollId', upload.array('photos', 50), async (req, res) => {
-  const roll = await queryOne('SELECT * FROM rolls WHERE id = ?', [Number(req.params.rollId)]);
-  if (!roll) return res.status(404).json({ error: 'Roll not found' });
+  try {
+    const roll = await queryOne('SELECT * FROM rolls WHERE id = ?', [Number(req.params.rollId)]);
+    if (!roll) return res.status(404).json({ error: 'Roll not found' });
 
-  const currentMax = await queryOne(
-    'SELECT MAX(sort_order) as max_order FROM photos WHERE roll_id = ?',
-    [Number(req.params.rollId)]
-  );
-  let sortOrder = (currentMax?.max_order || 0) + 1;
-
-  const photos = [];
-
-  for (const file of req.files) {
-    const ext = path.extname(file.originalname).toLowerCase() || '.jpg';
-    const filename = `${nanoid(12)}${ext}`;
-    const thumbFilename = thumbName(filename);
-
-    // Save original
-    await storage.save(filename, file.buffer);
-
-    // Generate thumbnail with Jimp
-    let width = 0, height = 0;
-    try {
-      const image = await Jimp.read(file.buffer);
-      width = image.width;
-      height = image.height;
-
-      // Resize for thumbnail
-      const thumb = image.clone().resize({ w: 400 });
-      const thumbBuffer = await thumb.getBuffer('image/jpeg', { quality: 80 });
-      await storage.save(thumbFilename, thumbBuffer);
-    } catch (e) {
-      // If Jimp can't process (e.g. TIFF), just save original as thumb
-      await storage.save(thumbFilename, file.buffer);
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ error: '没有收到任何文件' });
     }
 
-    const id = await run(
-      `INSERT INTO photos (roll_id, filename, original_name, sort_order, width, height)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [Number(req.params.rollId), filename, file.originalname, sortOrder++, width, height]
+    const currentMax = await queryOne(
+      'SELECT MAX(sort_order) as max_order FROM photos WHERE roll_id = ?',
+      [Number(req.params.rollId)]
     );
+    let sortOrder = (currentMax?.max_order || 0) + 1;
 
-    photos.push({
-      id,
-      filename,
-      original_name: file.originalname,
-      sort_order: sortOrder - 1,
-      width,
-      height
-    });
+    const photos = [];
+    const failed = [];
+
+    for (const file of req.files) {
+      try {
+        const ext = path.extname(file.originalname).toLowerCase() || '.jpg';
+        const filename = `${nanoid(12)}${ext}`;
+        const thumbFilename = thumbName(filename);
+
+        // Save original
+        await storage.save(filename, file.buffer);
+
+        // Generate thumbnail with Jimp
+        let width = 0, height = 0;
+        try {
+          const image = await Jimp.read(file.buffer);
+          width = image.width;
+          height = image.height;
+
+          // Resize for thumbnail
+          const thumb = image.clone().resize({ w: 400 });
+          const thumbBuffer = await thumb.getBuffer('image/jpeg', { quality: 80 });
+          await storage.save(thumbFilename, thumbBuffer);
+        } catch (e) {
+          // If Jimp can't process (e.g. HEIC / TIFF), just save original as thumb
+          console.error(`[upload] thumbnail failed for ${file.originalname}:`, e.message);
+          await storage.save(thumbFilename, file.buffer);
+        }
+
+        const id = await run(
+          `INSERT INTO photos (roll_id, filename, original_name, sort_order, width, height)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+          [Number(req.params.rollId), filename, file.originalname, sortOrder++, width, height]
+        );
+
+        photos.push({
+          id,
+          filename,
+          original_name: file.originalname,
+          sort_order: sortOrder - 1,
+          width,
+          height
+        });
+      } catch (fileErr) {
+        // One bad file should not abort the whole batch
+        console.error(`[upload] failed to process ${file.originalname}:`, fileErr);
+        failed.push({ name: file.originalname, reason: fileErr.message });
+      }
+    }
+
+    saveDB();
+
+    if (photos.length === 0) {
+      return res.status(500).json({ error: '所有照片处理失败', failed });
+    }
+
+    res.status(201).json({ photos, failed });
+  } catch (err) {
+    console.error('[upload] fatal error:', err);
+    res.status(500).json({ error: err.message || '上传失败' });
   }
-
-  saveDB();
-  res.status(201).json(photos);
 });
 
 // Serve photo file
@@ -170,6 +192,23 @@ router.delete('/:id', async (req, res) => {
   saveDB();
 
   res.status(204).end();
+});
+
+// Convert Multer / router errors into JSON so the client can show a real reason
+// (e.g. a file exceeding the 50MB limit is rejected before the route runs).
+router.use((err, req, res, next) => {
+  if (err instanceof multer.MulterError) {
+    console.error('[upload] multer error:', err.code, err.message);
+    const msg = err.code === 'LIMIT_FILE_SIZE'
+      ? '有照片超过 50MB 上限'
+      : `上传错误：${err.code}`;
+    return res.status(400).json({ error: msg });
+  }
+  if (err) {
+    console.error('[upload] router error:', err);
+    return res.status(500).json({ error: err.message || '上传失败' });
+  }
+  next();
 });
 
 export default router;

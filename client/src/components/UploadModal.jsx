@@ -36,10 +36,28 @@ export default function UploadModal({ isOpen, onClose, onUpload, rollId }) {
         body: formData,
       });
 
-      if (!res.ok) throw new Error('Upload failed');
-      const photos = await res.json();
+      // Always try to read the server's JSON (it carries the real error reason)
+      let data = null;
+      try { data = await res.json(); } catch (_) { /* non-JSON response */ }
+
+      if (!res.ok) {
+        const reason = data?.error || `服务器返回 ${res.status}`;
+        throw new Error(reason);
+      }
+
+      // New response shape: { photos, failed }; keep backward-compat with plain array
+      const photos = Array.isArray(data) ? data : (data?.photos || []);
+      const failed = Array.isArray(data) ? [] : (data?.failed || []);
+
       setProgress(100);
-      
+
+      if (failed.length > 0) {
+        alert(
+          `成功上传 ${photos.length} 张，${failed.length} 张失败：\n` +
+          failed.map(f => `· ${f.name}：${f.reason}`).join('\n')
+        );
+      }
+
       setTimeout(() => {
         setFiles([]);
         setUploading(false);
@@ -48,7 +66,7 @@ export default function UploadModal({ isOpen, onClose, onUpload, rollId }) {
         onClose();
       }, 500);
     } catch (err) {
-      alert('Upload failed: ' + err.message);
+      alert('上传失败：' + err.message);
       setUploading(false);
     }
   };

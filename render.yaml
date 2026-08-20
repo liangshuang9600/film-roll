@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: film-roll
+    runtime: node
+    plan: free
+    # 安装根依赖并触发 postinstall(装 server/client 子依赖),然后打包前端
+    buildCommand: npm install && npm run build
+    # 生产模式启动 Express,由它同时托管前端 dist 与 /api
+    startCommand: npm start
+    healthCheckPath: /api/rolls
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # ↓ 敏感值不写进仓库,部署后在 Render 控制台手动填入
+      - key: DATABASE_URL
+        sync: false
+      - key: OSS_REGION
+        value: oss-cn-hangzhou
+      - key: OSS_BUCKET
+        value: zt-film-roll
+      - key: OSS_ACCESS_KEY_ID
+        sync: false
+      - key: OSS_ACCESS_KEY_SECRET
+        sync: false
+      - key: DASHSCOPE_API_KEY
+        sync: false
+      - key: DASHSCOPE_MODEL
+        value: qwen-vl-max

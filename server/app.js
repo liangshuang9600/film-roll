@@ -6,6 +6,7 @@ import { initDB } from './db.js';
 import rollsRouter from './routes/rolls.js';
 import photosRouter from './routes/photos.js';
 import shareRouter from './routes/share.js';
+import aiRouter from './routes/ai.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -18,6 +19,7 @@ app.use(express.json());
 app.use('/api/rolls', rollsRouter);
 app.use('/api/photos', photosRouter);
 app.use('/api/share', shareRouter);
+app.use('/api/ai', aiRouter);
 
 // Serve uploaded files statically
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));

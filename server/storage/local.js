@@ -9,6 +9,9 @@ const UPLOAD_DIR = path.join(__dirname, '..', 'uploads');
 await fs.mkdir(UPLOAD_DIR, { recursive: true });
 
 export const storage = {
+  // true = files live on a remote object store (serve via getUrl)
+  isRemote: false,
+
   async save(filename, buffer) {
     const filepath = path.join(UPLOAD_DIR, filename);
     await fs.writeFile(filepath, buffer);
@@ -23,6 +26,11 @@ export const storage = {
   async remove(filename) {
     const filepath = path.join(UPLOAD_DIR, filename);
     await fs.unlink(filepath).catch(() => {});
+  },
+
+  // Local files have no public URL; serve them from disk instead.
+  getUrl() {
+    return null;
   },
 
   getPath(filename) {

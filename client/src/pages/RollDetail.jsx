@@ -4,6 +4,7 @@ import FilmStrip from '../components/FilmStrip';
 import UploadModal from '../components/UploadModal';
 import LightBox from '../components/LightBox';
 import ShareDialog from '../components/ShareDialog';
+import CopyCard from '../components/CopyCard';
 
 export default function RollDetail() {
   const { id } = useParams();
@@ -13,6 +14,9 @@ export default function RollDetail() {
   const [showUpload, setShowUpload] = useState(false);
   const [showShare, setShowShare] = useState(false);
   const [lightBoxIndex, setLightBoxIndex] = useState(-1);
+  const [caption, setCaption] = useState(null);
+  const [captionBusy, setCaptionBusy] = useState(false);
+  const [captionError, setCaptionError] = useState('');
 
   const fetchRoll = async () => {
     try {
@@ -27,6 +31,43 @@ export default function RollDetail() {
   };
 
   useEffect(() => { fetchRoll(); }, [id]);
+
+  useEffect(() => {
+    fetch(`/api/ai/caption/${id}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => { if (data) setCaption(data); })
+      .catch(() => {});
+  }, [id]);
+
+  const generateCaption = async () => {
+    setCaptionBusy(true);
+    setCaptionError('');
+    try {
+      const res = await fetch(`/api/ai/caption/${id}`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) {
+        setCaptionError(data.detail || data.error || '生成失败,请重试');
+      } else {
+        setCaption(data);
+      }
+    } catch (err) {
+      setCaptionError('网络错误,请重试');
+    }
+    setCaptionBusy(false);
+  };
+
+  const selectCover = async (photoId) => {
+    setCaption((prev) => (prev ? { ...prev, cover_photo_id: photoId } : prev));
+    try {
+      await fetch(`/api/ai/caption/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cover_photo_id: photoId }),
+      });
+    } catch {
+      // Non-fatal: local state already updated
+    }
+  };
 
   const handlePhotoClick = (photo, index) => {
     setLightBoxIndex(index);
@@ -83,6 +124,21 @@ export default function RollDetail() {
 
           {/* Actions */}
           <div className="flex items-center gap-2">
+            <button
+              onClick={generateCaption}
+              disabled={captionBusy}
+              className="flex items-center gap-2 px-3 py-2 bg-film-amber/10 border border-film-amber/30
+                text-film-amber rounded-lg hover:bg-film-amber/20 transition-colors text-sm font-mono disabled:opacity-50"
+            >
+              <svg className={`w-4 h-4 ${captionBusy ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                {captionBusy ? (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                ) : (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                )}
+              </svg>
+              {captionBusy ? '生成中…' : caption ? '重新生成文案' : '生成文案'}
+            </button>
             <button
               onClick={() => setShowUpload(true)}
               className="flex items-center gap-2 px-3 py-2 bg-film-amber/10 border border-film-amber/30 
@@ -142,6 +198,22 @@ export default function RollDetail() {
             Upload Photos
           </button>
         </div>
+      )}
+
+      {/* AI social-post caption */}
+      {captionError && (
+        <div className="mt-8 mx-auto max-w-[420px] text-center text-sm text-red-400/80 bg-red-500/5 border border-red-500/20 rounded-lg px-4 py-3">
+          {captionError}
+        </div>
+      )}
+      {caption && roll.photos && roll.photos.length > 0 && (
+        <CopyCard
+          caption={caption}
+          photos={roll.photos}
+          onSelectCover={selectCover}
+          onRegenerate={generateCaption}
+          generating={captionBusy}
+        />
       )}
 
       {/* Modals */}

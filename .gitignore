@@ -4,3 +4,6 @@ server/filmroll.db
 *.db
 .DS_Store
 client/dist
+.env
+.env.local
+server/.env
